@@ -1,0 +1,111 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   A_tab_creation.c                                   :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: aabdyli <aabdyli@student.42.fr>            +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2023/10/23 14:20:39 by aabdyli           #+#    #+#             */
+/*   Updated: 2023/10/23 14:20:41 by aabdyli          ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../../includes/minishell.h"
+
+static char	**ft_create_tab(t_shell *shell, char *buff);
+static int	ft_count_quotes(char *buff, t_shell *shell);
+static void	count_quotes_perror(int quote, char c, t_shell *shell);
+static char	**fix_tab(t_shell *shell, char **tab);
+
+/*	Creates the tab, returns ERROR if something went wrong.
+	Manages the " " and ' ' empty arg, resizing the tab if needed.
+	Gets rid of the quoted, creates the is_quoted tab.
+	Checks for syntax errors and returns its result. */
+
+int	tab_creation(t_shell *shell, char *buff)
+{
+	char	**tab;
+
+	shell->tab = NULL;
+	tab = ft_create_tab(shell, buff);
+	if (tab == NULL)
+		return (ERROR);
+	tab = fix_tab(shell, tab);
+	tab = quotes_management(shell, tab);
+	shell->tab = tab;
+	shell->buff = buff;
+	return (ft_syntax_error(tab, shell));
+}
+
+static char	**ft_create_tab(t_shell *shell, char *buff)
+{
+	char	**tab;
+
+	if (!buff || !buff[0])
+		return (NULL);
+	if (!buff || ft_count_quotes(buff, shell))
+		return (g_exit_code = SYNTAX_ERROR, NULL);
+	tab = ft_split_minishell(buff, ' ', shell);
+	return (tab);
+}
+
+static int	ft_count_quotes(char *buff, t_shell *shell)
+{
+	int		i;
+	int		quote;
+	char	c;
+
+	i = 0;
+	quote = 0;
+	c = ft_which_quote(buff);
+	while (buff[i])
+	{
+		if (buff[i] == c && quote % 2 == 1 && ++quote)
+		{
+			c = ft_which_quote(&buff[++i]);
+			if (buff[i] && buff[i] == c)
+				quote++;
+		}
+		else if (buff[i] == c && quote % 2 == 0)
+			quote++;
+		if (quote >= INT32_MAX - 3)
+			return (write(2, "Too many dbquotes\n", 19), ERROR);
+		if (!buff[i])
+			break ;
+		i++;
+	}
+	count_quotes_perror(quote, c, shell);
+	return (quote % 2);
+}
+
+static void	count_quotes_perror(int quote, char c, t_shell *shell)
+{
+	char	*buff;
+
+	if (quote % 2)
+	{
+		buff = ft_strdup("Minishell: Expected finishing \033[0;31m", shell);
+		if (c == '\'')
+			buff = ft_strcat(buff, "simple quote.\x1b[0m\n", shell);
+		if (c == '"')
+			buff = ft_strcat(buff, "double quote.\x1b[0m\n", shell);
+		write(2, buff, ft_strlen(buff));
+	}
+}
+
+static char	**fix_tab(t_shell *shell, char **tab)
+{
+	int		i;
+	char	**fixed;
+	int		y;
+
+	i = 0;
+	while (tab[i] && tab[i][0])
+		i++;
+	fixed = ft_calloc(sizeof(char *) * (i + 1), shell);
+	y = -1;
+	while (++y < i)
+		fixed[y] = tab[y];
+	fixed[y] = NULL;
+	return (fixed);
+}
